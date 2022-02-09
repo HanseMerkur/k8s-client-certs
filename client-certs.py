@@ -1,20 +1,26 @@
 import base64
 import json
 from inspect import cleandoc
+import socket
 
-from OpenSSL import crypto
-import requests
+from OpenSSL import crypto, SSL
 from kubernetes import client, config
 from kubernetes.client import configuration
 from kubernetes.client.exceptions import ApiException
 
 def generate_key(bits: int = 2048) -> crypto.PKey:
+    """
+    Create a simple RSA private key
+    """
     key = crypto.PKey()
     key.generate_key(crypto.TYPE_RSA, bits)
 
     return key
 
 def generate_csr(key: crypto.PKey, cn, o: str) -> crypto.X509Req:
+    """
+    Generate a Kubernetes CertificateSigningRequest-specific request using the provided key
+    """
     req = crypto.X509Req()
     req.get_subject().commonName = cn
     req.get_subject().organizationName = o
@@ -23,15 +29,38 @@ def generate_csr(key: crypto.PKey, cn, o: str) -> crypto.X509Req:
 
     return req
 
-def download_ca():
-    # Replace with: https://stackoverflow.com/a/58246407/294643
-    ca = requests.get("https://s3.hanse-merkur.de/wellerl/ca/Hansemerkur-CA.crt")
-    sub_ca = requests.get("https://s3.hanse-merkur.de/wellerl/ca/Hansemerkur-SubCA.crt")
+def download_ca(url):
+    """
+    Download the Certificate Authority Chain from the provided URL.
+    The chain can be used to enrich the kubeconfig
+    """
 
-    return ca.content + sub_ca.content
+    server = url.lstrip("https://").split(":")
+    hostname = server[0]
+    port = int(server[1]) if len(server) == 2 else 443
+
+    context = SSL.Context(method=SSL.TLS_METHOD)
+
+    conn = SSL.Connection(context, socket=socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+    conn.settimeout(5)
+    conn.connect((hostname, port))
+    conn.setblocking(1)
+    conn.do_handshake()
+    conn.set_tlsext_host_name(hostname.encode())
+
+    if len(conn.get_peer_cert_chain()) < 1:
+        raise Exception("No CA certificate available")
+
+    ca_chain = ""
+    for cert in conn.get_peer_cert_chain():
+        ca_chain += crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode("utf-8").rstrip()
+
+    return ca_chain
 
 def create_signing_request(csr: crypto.X509Req, user, group: str) -> client.V1CertificateSigningRequest:
     """
+    Create a kubernetes CertificateSigningRequest using the standard client handler on the apiserver
+    The CSR has to be a valid X509 CSR with CN being the username and O being the group in kubernetes
     """
 
     csr_b64 = base64.b64encode(crypto.dump_certificate_request(crypto.FILETYPE_PEM, csr)).decode('utf-8')
@@ -60,6 +89,8 @@ def create_signing_request(csr: crypto.X509Req, user, group: str) -> client.V1Ce
 
 def approve_signing_request(k8s_csr: client.V1CertificateSigningRequest):
     """
+    Automatically approve the CSR using the API.
+    A certificate is approved by adding a status condition of type Approval
     """
 
     condition = client.V1CertificateSigningRequestCondition(
@@ -80,6 +111,7 @@ def approve_signing_request(k8s_csr: client.V1CertificateSigningRequest):
 
 def receive_certificate(k8s_csr: client.V1CertificateSigningRequest) -> bytes:
     """
+    Download the approved certificate which is saved in the CertificateSigningRequest status field
     """
 
     csr_api = client.CertificatesV1Api()
@@ -92,9 +124,9 @@ def receive_certificate(k8s_csr: client.V1CertificateSigningRequest) -> bytes:
 
 
 if __name__ == "__main__":
-    user = "wellerl"
-    group = "cluster-admin"
-    server = "https://api.int.hcp.hanse-merkur.de:6443"
+    user = "user"
+    group = "group"
+    server = "https://cluster-service.url:6443"
 
     config.load_kube_config()
     configuration.Configuration().verify_ssl = False
@@ -106,7 +138,8 @@ if __name__ == "__main__":
     approve_signing_request(k8s_csr)
     k8s_cert = receive_certificate(k8s_csr)
 
-    ca = download_ca()
+    #ca = download_ca(server)
+    # -> certificate-authority-data: {base64.b64encode(ca.encode('utf-8')).decode('utf-8')}
 
     with open("kubeconfig", "w+") as f:
         f.write(cleandoc(
@@ -115,7 +148,6 @@ if __name__ == "__main__":
             kind: Config
             clusters:
             - cluster:
-                #certificate-authority-data: {base64.b64encode(ca).decode('utf-8')}
                 insecure-skip-tls-verify: true
                 server: {server}
               name: default
