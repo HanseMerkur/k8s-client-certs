@@ -2,6 +2,9 @@ import base64
 import json
 from inspect import cleandoc
 import socket
+import argparse
+import sys
+from typing import List
 
 from OpenSSL import crypto, SSL
 from kubernetes import client, config
@@ -17,19 +20,19 @@ def generate_key(bits: int = 2048) -> crypto.PKey:
 
     return key
 
-def generate_csr(key: crypto.PKey, cn, o: str) -> crypto.X509Req:
+def generate_csr(key: crypto.PKey, user: str, group: str) -> crypto.X509Req:
     """
     Generate a Kubernetes CertificateSigningRequest-specific request using the provided key
     """
     req = crypto.X509Req()
-    req.get_subject().commonName = cn
-    req.get_subject().organizationName = o
+    req.get_subject().commonName = user
+    req.get_subject().organizationalUnitName = group
     req.set_pubkey(key)
     req.sign(key, "sha256")
 
     return req
 
-def download_ca(url):
+def download_ca(url: str) -> str:
     """
     Download the Certificate Authority Chain from the provided URL.
     The chain can be used to enrich the kubeconfig
@@ -57,7 +60,7 @@ def download_ca(url):
 
     return ca_chain
 
-def create_signing_request(csr: crypto.X509Req, user, group: str) -> client.V1CertificateSigningRequest:
+def create_signing_request(csr: crypto.X509Req, user: str, group: str) -> client.V1CertificateSigningRequest:
     """
     Create a kubernetes CertificateSigningRequest using the standard client handler on the apiserver
     The CSR has to be a valid X509 CSR with CN being the username and O being the group in kubernetes
@@ -124,17 +127,21 @@ def receive_certificate(k8s_csr: client.V1CertificateSigningRequest) -> bytes:
 
 
 if __name__ == "__main__":
-    user = "user"
-    group = "group"
-    server = "https://cluster-service.url:6443"
+    parser = argparse.ArgumentParser(description="Create a kubeconfig using automatically approved client certificates")
+    parser.add_argument("-u", "--user", help="Mapped kubernetes username, can be used for rbac")
+    parser.add_argument("-g", "--group", nargs="?", help="1..n groups for rbac mappings") #  action="append",
+    parser.add_argument("apiserver", help="The kube-apiserver URL e.g. https://cluster.domain.tld")
+
+    args = parser.parse_args()
+    print(args)
 
     config.load_kube_config()
     configuration.Configuration().verify_ssl = False
 
     key = generate_key(2048)
-    csr = generate_csr(key, user, group)
+    csr = generate_csr(key, args.user, args.group)
 
-    k8s_csr = create_signing_request(csr, user, group)
+    k8s_csr = create_signing_request(csr, args.user, args.group)
     approve_signing_request(k8s_csr)
     k8s_cert = receive_certificate(k8s_csr)
 
@@ -149,7 +156,7 @@ if __name__ == "__main__":
             clusters:
             - cluster:
                 insecure-skip-tls-verify: true
-                server: {server}
+                server: {args.apiserver}
               name: default
             contexts:
             - context:
