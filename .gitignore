@@ -136,3 +136,4 @@ dmypy.json
 *.json
 config.yaml
 dev.env
+kubeconfig
