@@ -2,7 +2,6 @@ import base64
 import os
 import sys
 from inspect import cleandoc
-import socket
 import argparse
 import json
 
@@ -10,6 +9,7 @@ from OpenSSL import crypto, SSL
 from pykube import HTTPClient, KubeConfig
 from pykube.objects import APIObject
 from pykube.exceptions import KubernetesError, ObjectDoesNotExist
+
 
 class CertificateSigningRequest(APIObject):
     version = "certificates.k8s.io/v1"
@@ -35,18 +35,20 @@ class CertificateSigningRequest(APIObject):
                         "message": "Approved by automatic kubenav script",
                         "status": "True",
                         "type": "Approved",
-                        "reason": "KubenavApprove"
+                        "reason": "KubenavApprove",
                     }
                 ]
             }
         }
-        r = self.api.patch(**self.api_kwargs(
-            operation="approval",
-            headers={"Content-Type": "application/merge-patch+json"},
-            data=json.dumps(patch_status),
-        ))
+        r = self.api.patch(
+            **self.api_kwargs(
+                operation="approval",
+                headers={"Content-Type": "application/merge-patch+json"},
+                data=json.dumps(patch_status),
+            )
+        )
         self.api.raise_for_status(r)
-        self.set_obj(r.json()) 
+        self.set_obj(r.json())
 
     @staticmethod
     def new(api: HTTPClient, user, group: str, csr: crypto.X509Req):
@@ -54,20 +56,20 @@ class CertificateSigningRequest(APIObject):
         Create a kubernetes CertificateSigningRequest using the standard client handler on the apiserver
         The CSR has to be a valid X509 CSR with CN being the username and O being the group in kubernetes
         """
-        csr_b64 = base64.b64encode(crypto.dump_certificate_request(crypto.FILETYPE_PEM, csr)).decode('utf-8')
+        csr_b64 = base64.b64encode(
+            crypto.dump_certificate_request(crypto.FILETYPE_PEM, csr)
+        ).decode("utf-8")
         obj = {
             "apiVersion": "certificates.k8s.io/v1",
             "kind": "CertificateSigningRequest",
-            "metadata": {
-                "name": user
-            },
+            "metadata": {"name": user},
             "spec": {
                 "username": user,
                 "groups": [group],
                 "request": csr_b64,
                 "signerName": "kubernetes.io/kube-apiserver-client",
-                "usages": ["client auth"]
-            }
+                "usages": ["client auth"],
+            },
         }
         return CertificateSigningRequest(api, obj)
 
@@ -80,6 +82,7 @@ def generate_key(bits: int = 2048) -> crypto.PKey:
     key.generate_key(crypto.TYPE_RSA, bits)
 
     return key
+
 
 def generate_csr(key: crypto.PKey, user: str, group: str) -> crypto.X509Req:
     """
@@ -94,11 +97,20 @@ def generate_csr(key: crypto.PKey, user: str, group: str) -> crypto.X509Req:
 
     return req
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Create a kubeconfig using automatically approved client certificates")
-    parser.add_argument("-u", "--user", help="Mapped kubernetes username, can be used for rbac")
-    parser.add_argument("-g", "--group", nargs="?", help="1..n groups for rbac mappings") #  action="append",
-    parser.add_argument("apiserver", help="The kube-apiserver URL e.g. https://cluster.domain.tld")
+    parser = argparse.ArgumentParser(
+        description="Create a kubeconfig using automatically approved client certificates"
+    )
+    parser.add_argument(
+        "-u", "--user", help="Mapped kubernetes username, can be used for rbac"
+    )
+    parser.add_argument(
+        "-g", "--group", nargs="?", help="1..n groups for rbac mappings"
+    )  #  action="append",
+    parser.add_argument(
+        "apiserver", help="The kube-apiserver URL e.g. https://cluster.domain.tld"
+    )
 
     args = parser.parse_args()
     print(args)
@@ -130,8 +142,9 @@ if __name__ == "__main__":
         sys.exit(1)
 
     with open("kubeconfig", "w+") as f:
-        f.write(cleandoc(
-            f"""
+        f.write(
+            cleandoc(
+                f"""
             apiVersion: v1
             kind: Config
             clusters:
