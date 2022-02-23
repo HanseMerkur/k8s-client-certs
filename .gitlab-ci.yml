@@ -1,0 +1,41 @@
+---
+stages:
+  - build
+  - release
+
+build:
+  stage: build
+  image: python:3.9-slim
+  script:
+    - apt-get update && apt-get install -y binutils
+    - pip install -r requirements.txt
+    - pip install pyinstaller==4.9
+    - pyinstaller -F -s -n clientcerts clientcerts/__main__.py
+  after_script:
+    - echo "JOB_ID=$CI_JOB_ID" >> job.env
+  artifacts:
+    paths:
+      - dist/clientcerts
+    reports:
+      dotenv: job.env
+
+upload:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - job: build
+      artifacts: true
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "running release_job for $CI_COMMIT_TAG"
+    - echo "make download available for $JOB_ID"
+  release:
+    name: $CI_COMMIT_TAG
+    description: $CI_COMMIT_MESSAGE
+    tag_name: $CI_COMMIT_TAG
+    ref: $CI_COMMIT_SHA
+    assets:
+      links:
+        - name: "artifact.zip"
+          url: "https://gitpro.hanse-merkur.de/wellerl/client-certs/-/jobs/$JOB_ID/artifacts/download"

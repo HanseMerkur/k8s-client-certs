@@ -45,6 +45,7 @@ class ClientCertificate:
         self.user = args.user
         self.groups = args.groups
         self.expiry = args.expiry
+        self.path = args.file
 
         self.api = HTTPClient(KubeConfig.from_file())
         self.key = self._generate_key(2048)
@@ -78,7 +79,7 @@ class ClientCertificate:
             encryption_algorithm=serialization.NoEncryption(),
         )
 
-        with open("kubeconfig", "w+") as f:
+        with open(self.file, "w+") as f:
             f.write(
                 cleandoc(
                     f"""
