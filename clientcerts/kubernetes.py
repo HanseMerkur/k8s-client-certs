@@ -22,8 +22,8 @@ class CertificateSigningRequest(APIObject):
     def approve(self):
         """
         Automatically approve the CSR using the API.
-        A certificate is approved by adding a status condition of type Approval
 
+        A certificate is approved by adding a status condition of type Approval
         The patch can only be applied to the approval operation endpoint
         """
         patch_status = {
@@ -53,10 +53,11 @@ class CertificateSigningRequest(APIObject):
         api: HTTPClient,
         user: str,
         csr: x509.CertificateSigningRequest,
-        expiry: str = "86400",
+        expiry: str
     ):
         """
         Create a kubernetes CertificateSigningRequest using the standard client handler on the apiserver
+
         The CSR has to be a valid X509 CSR with CN being the username and O being the group in kubernetes
 
         :param expiry will only be used by kubelet > v1.22

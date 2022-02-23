@@ -33,9 +33,7 @@ class ClientCertificate:
         builder = x509.CertificateSigningRequestBuilder()
         subject = [x509.NameAttribute(NameOID.COMMON_NAME, user)]
         for group in groups:
-            # Documentation says O is correct. Some sites report OU
             subject.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, group))
-            subject.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, group))
         builder = builder.subject_name(x509.Name(subject))
         request = builder.sign(self.key, hashes.SHA256())
         return request
@@ -51,6 +49,12 @@ class ClientCertificate:
         self.key = self._generate_key(2048)
 
     def create_csr(self) -> CertificateSigningRequest:
+        """
+        Create and Approve the CertificateSigningRequest on the kubernetes cluster
+
+        If one exist with the same name delete it first as we cannot ensure that we have the private key the CSR was signed with.
+        """
+
         csr = self.generate_csr(self.user, self.groups)
         try:
             try:
@@ -73,6 +77,10 @@ class ClientCertificate:
         return k8s_csr
 
     def write_kubeconfig(self, k8s_csr):
+        """
+        Write out the kubeconfig file
+        """
+
         key_pem = self.key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
