@@ -38,4 +38,4 @@ upload:
     assets:
       links:
         - name: "artifact.zip"
-          url: "https://gitpro.hanse-merkur.de/wellerl/client-certs/-/jobs/$JOB_ID/artifacts/download"
+          url: "${CI_SERVER_URL}/${CI_PROJECT_PATH}/-/jobs/$JOB_ID/artifacts/download"
