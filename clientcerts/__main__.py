@@ -59,7 +59,7 @@ def main():
     args = parser.parse_args()
 
     # Let requests load your custom vendor ca-certificates
-    os.environ["REQUESTS_CA_BUNDLE"] = parser.ca_certificate
+    os.environ["REQUESTS_CA_BUNDLE"] = args.ca_certificate
 
     # Workaround for concatenated KUBECONFIG files. pykube is missing the support
     if ":" in os.environ["KUBECONFIG"]:
