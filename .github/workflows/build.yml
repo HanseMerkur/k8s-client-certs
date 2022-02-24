@@ -18,14 +18,6 @@ jobs:
     - name: Create binary
       run: pyinstaller -F -s -n clientcerts-${RUNNER_OS}-${RUNNER_ARCH} clientcerts/__main__.py
       shell: bash
-    - name: Pack binary
-      uses: crazy-max/ghaction-upx@v1
-      with:
-        version: latest
-        files: |
-          ./dist/*
-        args: -fq
-      if: runner.os != 'macOS'
     - uses: actions/upload-artifact@v2
       with:
         path: dist/*
