@@ -16,6 +16,7 @@ jobs:
 
     - run: pip install -r requirements.txt pyinstaller==4.9
     - run: pyinstaller -F -s -n clientcerts-${RUNNER_OS}-${RUNNER_ARCH} clientcerts/__main__.py
+      shell: bash
     - uses: actions/upload-artifact@v2
       with:
         path: dist/*
