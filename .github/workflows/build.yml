@@ -25,7 +25,7 @@ jobs:
         files: |
           ./dist/*
         args: -fq
-      if: $RUNNER_OS != 'macOS'
+      if: runner.os != 'macOS'
     - uses: actions/upload-artifact@v2
       with:
         path: dist/*
