@@ -15,8 +15,17 @@ jobs:
         python-version: 3.9
 
     - run: pip install -r requirements.txt pyinstaller==4.9
-    - run: pyinstaller -F -s -n clientcerts-${RUNNER_OS}-${RUNNER_ARCH} clientcerts/__main__.py
+    - name: Create binary
+      run: pyinstaller -F -s -n clientcerts-${RUNNER_OS}-${RUNNER_ARCH} clientcerts/__main__.py
       shell: bash
+    - name: Pack binary
+      uses: crazy-max/ghaction-upx@v1
+      with:
+        version: latest
+        files: |
+          ./dist/*
+        args: -fq
+      if: $RUNNER_OS != 'macOS'
     - uses: actions/upload-artifact@v2
       with:
         path: dist/*
