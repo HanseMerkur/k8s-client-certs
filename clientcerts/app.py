@@ -1,15 +1,14 @@
 import sys
 from typing import List
-from inspect import cleandoc
 import base64
 
+from yaml import dump, Dumper
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509.oid import NameOID
-
 from pykube import HTTPClient, KubeConfig
 from pykube.exceptions import KubernetesError, ObjectDoesNotExist
 
@@ -86,30 +85,40 @@ class ClientCertificate:
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption(),
         )
-
+        kubeconfig = {
+            "apiVersion": "v1",
+            "kind": "Config",
+            "clusters": [
+                {
+                    "name": "default",
+                    "cluster": {
+                        "insecure-skip-tls-verify": "true",
+                        "server": self.apiserver,
+                    },
+                }
+            ],
+            "contexts": [
+                {
+                    "name": "default",
+                    "context": {
+                        "cluster": "default",
+                        "namespace": "default",
+                        "user": "default",
+                    },
+                }
+            ],
+            "current-context": "default",
+            "users": [
+                {
+                    "name": "default",
+                    "user": {
+                        "client-certificate-data": k8s_csr.certificate,
+                        "client-key-data": base64.b64encode(key_pem).decode(
+                            "utf-8"
+                        ),
+                    },
+                }
+            ],
+        }
         with open(self.path, "w+") as f:
-            f.write(
-                cleandoc(
-                    f"""
-                apiVersion: v1
-                kind: Config
-                clusters:
-                - cluster:
-                    insecure-skip-tls-verify: true
-                    server: {self.apiserver}
-                name: default
-                contexts:
-                - context:
-                    cluster: default
-                    namespace: default
-                    user: default
-                name: default
-                current-context: default
-                users:
-                - name: default
-                user:
-                    client-certificate-data: {k8s_csr.certificate}
-                    client-key-data: {base64.b64encode(key_pem).decode('utf-8')}
-                """
-                )
-            )
+            f.write(dump(kubeconfig, Dumper=Dumper))
