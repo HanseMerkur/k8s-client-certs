@@ -87,7 +87,7 @@ class ClientCertificate:
             encryption_algorithm=serialization.NoEncryption(),
         )
 
-        with open(self.file, "w+") as f:
+        with open(self.path, "w+") as f:
             f.write(
                 cleandoc(
                     f"""

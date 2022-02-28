@@ -49,7 +49,7 @@ def main():
     parser.add_argument(
         "-f",
         "--file",
-        default="kubeconfig",
+        default="./kubeconfig",
         help="Output path for the client certificate based kubeconfig. Existing files will be overwritten"
     )
     parser.add_argument(
