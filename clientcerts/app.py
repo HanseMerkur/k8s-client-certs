@@ -92,7 +92,7 @@ class ClientCertificate:
                 {
                     "name": "default",
                     "cluster": {
-                        "insecure-skip-tls-verify": "true",
+                        "insecure-skip-tls-verify": True,
                         "server": self.apiserver,
                     },
                 }
